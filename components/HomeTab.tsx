@@ -5,11 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 
 const keys = [
-  { id: 'silver', src: '/img/Серебро.svg', price: 1 },
-  { id: 'gold', src: '/img/Золото.png', price: 39 },
-  { id: 'bronze', src: '/img/Древо.png', price: 99 },
+  { id: 'silver', src: '/img/Серебро.svg', price: 39 },
+  { id: 'gold', src: '/img/Золото.png', price: 99 },
+  { id: 'bronze', src: '/img/Древо.png', price: 9 },
 ]
-
 
 type KeyType = typeof keys[number]
 
@@ -19,9 +18,8 @@ const positions = [
   { x: 120, y: 0, scale: 0.9, blur: 5, zIndex: 1 },
 ]
 
-const random = (min: number, max: number) => Math.random () * (max - min) + min
+const random = (min: number, max: number) => Math.random() * (max - min) + min
 
-// Промокоды
 const promoCodes: { code: string; discount: number }[] = [
   { code: 'PROMO5', discount: 0.05 },
   { code: 'PROMO10', discount: 0.10 },
@@ -37,7 +35,13 @@ const KeyCarousel: React.FC = () => {
   const [activePromo, setActivePromo] = useState<{ code: string; discount: number } | null>(null)
   const [promoError, setPromoError] = useState('')
 
+  // Снег
+  const [snowflakes, setSnowflakes] = useState<{ x: number; y: number; size: number; speed: number }[]>([])
+  // Облака
+  const [clouds, setClouds] = useState<{ x: number; y: number; scale: number; speed: number }[]>([])
+
   useEffect(() => {
+    // Частицы для оплаты
     const temp: { x: number; y: number; size: number; delay: number }[] = []
     for (let i = 0; i < 50; i++) {
       temp.push({
@@ -48,6 +52,30 @@ const KeyCarousel: React.FC = () => {
       })
     }
     setParticles(temp)
+
+    // Снег
+    const snowTemp: { x: number; y: number; size: number; speed: number }[] = []
+    for (let i = 0; i < 50; i++) {
+      snowTemp.push({
+        x: random(0, window.innerWidth),
+        y: random(0, window.innerHeight),
+        size: random(5, 12),
+        speed: random(5, 15),
+      })
+    }
+    setSnowflakes(snowTemp)
+
+    // Облака
+    const cloudTemp: { x: number; y: number; scale: number; speed: number }[] = []
+    for (let i = 0; i < 5; i++) {
+      cloudTemp.push({
+        x: random(-200, window.innerWidth),
+        y: random(50, 200),
+        scale: random(0.8, 1.5),
+        speed: random(20, 60),
+      })
+    }
+    setClouds(cloudTemp)
   }, [])
 
   const rotateLeft = () => setOrder([order[1], order[2], order[0]])
@@ -64,7 +92,7 @@ const KeyCarousel: React.FC = () => {
   }
 
   const applyPromo = () => {
-    if (activePromo) return // уже применен промокод
+    if (activePromo) return
     const promo = promoCodes.find(p => p.code.toUpperCase() === promoInput.toUpperCase())
     if (!promo) {
       setPromoError('Промокод недействителен')
@@ -95,27 +123,27 @@ const KeyCarousel: React.FC = () => {
 
       const data = await res.json()
 
-if (data.invoiceLink && window.Telegram?.WebApp) {
-  window.Telegram.WebApp.openInvoice(data.invoiceLink)
+      if (data.invoiceLink && window.Telegram?.WebApp) {
+        window.Telegram.WebApp.openInvoice(data.invoiceLink)
 
-  const handleInvoiceClose = async (event: any) => {
-    if (event.status === 'paid') {
-      await fetch(`https://api.telegram.org/bot8042001288:AAGIKxiLEljnN6dtYxkohZ_TG30S0zElTU8/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: window.Telegram!.WebApp.initDataUnsafe.user.id,
-          text: `Вы успешно оплатили! Ваш ключ придет в этот чат.`,
-        }),
-      })
-      setShowNotification(true)
-      setTimeout(() => setShowNotification(false), 4000)
-    }
-    window.Telegram?.WebApp.offEvent('invoiceClosed', handleInvoiceClose)
-  }
+        const handleInvoiceClose = async (event: any) => {
+          if (event.status === 'paid') {
+            await fetch(`https://api.telegram.org/bot8042001288:AAGIKxiLEljnN6dtYxkohZ_TG30S0zElTU8/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: window.Telegram!.WebApp.initDataUnsafe.user.id,
+                text: `Вы успешно оплатили! Ваш ключ придет в этот чат.`,
+              }),
+            })
+            setShowNotification(true)
+            setTimeout(() => setShowNotification(false), 4000)
+          }
+          window.Telegram?.WebApp.offEvent('invoiceClosed', handleInvoiceClose)
+        }
 
-  window.Telegram.WebApp.onEvent('invoiceClosed', handleInvoiceClose)
-}
+        window.Telegram.WebApp.onEvent('invoiceClosed', handleInvoiceClose)
+      }
 
     } catch (err) {
       console.error(err)
@@ -132,8 +160,49 @@ if (data.invoiceLink && window.Telegram?.WebApp) {
         backgroundColor: '#6ec5ffff',
         position: 'relative',
         flexDirection: 'column',
+        overflow: 'hidden',
       }}
     >
+      {/* Снег */}
+      {snowflakes.map((flake, i) => (
+        <motion.div
+          key={i}
+          style={{
+            position: 'absolute',
+            top: flake.y,
+            left: flake.x,
+            width: flake.size,
+            height: flake.size,
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255,255,255,0.8)',
+          }}
+          animate={{ y: window.innerHeight + flake.size }}
+          transition={{ repeat: Infinity, duration: flake.speed, ease: "linear", delay: Math.random() * 5 }}
+        />
+      ))}
+
+      {/* Облака */}
+      {clouds.map((cloud, i) => (
+        <motion.div
+          key={i}
+          style={{
+            position: 'absolute',
+            top: cloud.y,
+            left: cloud.x,
+            scale: cloud.scale,
+            opacity: 0.5,
+          }}
+          animate={{ x: window.innerWidth + 200 }}
+          transition={{ repeat: Infinity, duration: cloud.speed, ease: "linear" }}
+        >
+          <svg width="200" height="80" viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="50" cy="40" rx="50" ry="25" fill="white" />
+            <ellipse cx="100" cy="40" rx="50" ry="25" fill="white" />
+            <ellipse cx="150" cy="40" rx="50" ry="25" fill="white" />
+          </svg>
+        </motion.div>
+      ))}
+
       {/* Тексты сверху */}
       <div style={{ position: 'absolute', top: '20px', width: '100%', textAlign: 'center' }}>
         <h1 style={{ color: '#fff', textShadow: '2px 2px 8px rgba(0,0,0,0.5)', fontSize: '2rem', margin: 0 }}>Выбери ключ</h1>

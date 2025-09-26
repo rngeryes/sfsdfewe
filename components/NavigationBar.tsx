@@ -20,8 +20,8 @@ const NavigationBar = () => {
 
     const tabs: { id: TabType; label: string; Icon: React.FC<{ className?: string }> }[] = [
         { id: 'home', label: 'Главная', Icon: Home },
-        { id: 'friends', label: 'Колесо', Icon: Friends },
-      //  { id: 'earn', label: 'Друзья', Icon: Earn },
+        { id: 'friends', label: 'Колесо', Icon: Earn },
+        { id: 'earn', label: 'Профиль', Icon: Friends },
     ]
 
     return (

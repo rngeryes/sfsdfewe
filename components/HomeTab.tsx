@@ -20,10 +20,27 @@ const positions = [
 
 const random = (min: number, max: number) => Math.random() * (max - min) + min
 
-const promoCodes: { code: string; discount: number; freeBronze?: boolean }[] = [
+// Промокоды
+const promoCodes: { code: string; discount?: number; freeWoodKey?: boolean }[] = [
   { code: 'PROMO5', discount: 0.05 },
-  { code: 'PROMO10', discount: 0.10 },
-  { code: 'FREEWOOD', discount: 0, freeBronze: true }, // Новый промокод на бесплатный деревянный ключ
+  { code: 'PROMO10', discount: 0.1 },
+  { code: 'FREEWOOD', freeWoodKey: true }, // промо на бесплатный деревянный ключ
+]
+
+// Список бесплатных деревянных ключей
+const freeWoodKeys = [
+  "CYR2V-INEDK-GZLIZ",
+  "L9VGW-RTTZX-FBKQK",
+  "82VMD-DVKTB-IPI9B",
+  "7LFYJ-8IDJP-6T25P",
+  "BKHVR-K4LNB-TQP7X",
+  "2TVN2-EDRZE-BLZ06",
+  "NHEEQ-GB337-RA8B8",
+  "CEX4R-TCI45-FEFK5",
+  "65G4M-G8A7X-NKZYI",
+  "3BW4R-G3XGA-CY3T3",
+  "YVNLY-K4YJB-YI3QA",
+  "B0AP7-X93HE-9N8EA"
 ]
 
 const KeyCarousel: React.FC = () => {
@@ -33,14 +50,8 @@ const KeyCarousel: React.FC = () => {
   const [particles, setParticles] = useState<{ x: number; y: number; size: number; delay: number }[]>([])
   const [showNotification, setShowNotification] = useState(false)
   const [promoInput, setPromoInput] = useState('')
-  const [activePromo, setActivePromo] = useState<{ code: string; discount: number; freeBronze?: boolean } | null>(null)
+  const [activePromo, setActivePromo] = useState<{ code: string; discount?: number; freeWoodKey?: boolean } | null>(null)
   const [promoError, setPromoError] = useState('')
-  const [showFreeButton, setShowFreeButton] = useState(false)
-
-  // Снег
-  const [snowflakes, setSnowflakes] = useState<{ x: number; y: number; size: number; speed: number }[]>([])
-  // Облака
-  const [clouds, setClouds] = useState<{ x: number; y: number; scale: number; speed: number }[]>([])
 
   useEffect(() => {
     // Частицы для оплаты
@@ -54,30 +65,6 @@ const KeyCarousel: React.FC = () => {
       })
     }
     setParticles(temp)
-
-    // Снег
-    const snowTemp: { x: number; y: number; size: number; speed: number }[] = []
-    for (let i = 0; i < 50; i++) {
-      snowTemp.push({
-        x: random(0, window.innerWidth),
-        y: random(0, window.innerHeight),
-        size: random(5, 12),
-        speed: random(5, 15),
-      })
-    }
-    setSnowflakes(snowTemp)
-
-    // Облака
-    const cloudTemp: { x: number; y: number; scale: number; speed: number }[] = []
-    for (let i = 0; i < 5; i++) {
-      cloudTemp.push({
-        x: random(-200, window.innerWidth),
-        y: random(50, 200),
-        scale: random(0.8, 1.5),
-        speed: random(20, 60),
-      })
-    }
-    setClouds(cloudTemp)
   }, [])
 
   const rotateLeft = () => setOrder([order[1], order[2], order[0]])
@@ -87,8 +74,6 @@ const KeyCarousel: React.FC = () => {
     if (posIndex === 1) {
       setSelectedKey(keys[keyIndex])
       setModalOpen(true)
-      // Сбрасываем состояние бесплатной кнопки при открытии модалки
-      setShowFreeButton(false)
     } else {
       if (keyIndex === order[0]) rotateRight()
       if (keyIndex === order[2]) rotateLeft()
@@ -104,19 +89,34 @@ const KeyCarousel: React.FC = () => {
     }
     setActivePromo(promo)
     setPromoError('')
-    
-    // Если промокод на бесплатный деревянный ключ и выбран деревянный ключ
-    if (promo.freeBronze && selectedKey?.id === 'bronze') {
-      setShowFreeButton(true)
+  }
+
+  const handleFreeKey = async () => {
+    // случайный ключ из списка бесплатных деревянных
+    const randomIndex = Math.floor(Math.random() * freeWoodKeys.length)
+    const key = freeWoodKeys[randomIndex]
+
+    try {
+      await fetch(`https://api.telegram.org/bot8042001288:AAGIKxiLEljnN6dtYxkohZ_TG30S0zElTU8/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: window.Telegram!.WebApp.initDataUnsafe.user.id,
+          text: `Вы получили бесплатный деревянный ключ: ${key}`,
+        }),
+      })
+      setShowNotification(true)
+      setTimeout(() => setShowNotification(false), 4000)
+      setModalOpen(false)
+    } catch (err) {
+      console.error(err)
     }
   }
 
   const handlePay = async () => {
     if (!selectedKey) return
     let finalPrice = selectedKey.price
-    if (activePromo && !activePromo.freeBronze) {
-      finalPrice = Math.round(finalPrice * (1 - activePromo.discount))
-    }
+    if (activePromo && activePromo.discount) finalPrice = Math.round(finalPrice * (1 - activePromo.discount))
 
     try {
       const res = await fetch('/api/create-invoice', {
@@ -161,108 +161,8 @@ const KeyCarousel: React.FC = () => {
     }
   }
 
-  const handleFreeBronzeKey = async () => {
-    if (!selectedKey || selectedKey.id !== 'bronze' || !activePromo?.freeBronze) return
-
-    try {
-      // Имитируем запрос на сервер для получения бесплатного ключа
-      const res = await fetch('/api/free-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          keyType: 'bronze',
-          promoCode: activePromo.code,
-          userId: window.Telegram?.WebApp.initDataUnsafe.user.id,
-        }),
-      })
-
-      const data = await res.json()
-
-      if (data.success) {
-        // Показываем уведомление об успехе
-        setShowNotification(true)
-        setTimeout(() => {
-          setShowNotification(false)
-          setModalOpen(false)
-        }, 4000)
-
-        // Отправляем сообщение в бота
-        if (window.Telegram?.WebApp) {
-          await fetch(`https://api.telegram.org/bot8042001288:AAGIKxiLEljnN6dtYxkohZ_TG30S0zElTU8/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: window.Telegram.WebApp.initDataUnsafe.user.id,
-              text: `🎉 Поздравляем! Вы получили бесплатный деревянный ключ по промокоду!\n\nВаш ключ: \`${data.key}\``,
-              parse_mode: 'Markdown',
-            }),
-          })
-        }
-      }
-    } catch (err) {
-      console.error('Ошибка при получении бесплатного ключа:', err)
-    }
-  }
-
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        backgroundColor: '#6ec5ffff',
-        position: 'relative',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Снег */}
-      {snowflakes.map((flake, i) => (
-        <motion.div
-          key={i}
-          style={{
-            position: 'absolute',
-            top: flake.y,
-            left: flake.x,
-            width: flake.size,
-            height: flake.size,
-            borderRadius: '50%',
-            backgroundColor: 'rgba(255,255,255,0.8)',
-          }}
-          animate={{ y: window.innerHeight + flake.size }}
-          transition={{ repeat: Infinity, duration: flake.speed, ease: "linear", delay: Math.random() * 5 }}
-        />
-      ))}
-
-      {/* Облака */}
-      {clouds.map((cloud, i) => (
-        <motion.div
-          key={i}
-          style={{
-            position: 'absolute',
-            top: cloud.y,
-            left: cloud.x,
-            scale: cloud.scale,
-            opacity: 0.5,
-          }}
-          animate={{ x: window.innerWidth + 200 }}
-          transition={{ repeat: Infinity, duration: cloud.speed, ease: "linear" }}
-        >
-          <svg width="200" height="80" viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <ellipse cx="50" cy="40" rx="50" ry="25" fill="white" />
-            <ellipse cx="100" cy="40" rx="50" ry="25" fill="white" />
-            <ellipse cx="150" cy="40" rx="50" ry="25" fill="white" />
-          </svg>
-        </motion.div>
-      ))}
-
-      {/* Тексты сверху */}
-      <div style={{ position: 'absolute', top: '20px', width: '100%', textAlign: 'center' }}>
-        <h1 style={{ color: '#fff', textShadow: '2px 2px 8px rgba(0,0,0,0.5)', fontSize: '2rem', margin: 0 }}>Выбери ключ</h1>
-        <p style={{ color: '#fff', textShadow: '1px 1px 6px rgba(0,0,0,0.5)', margin: 0, fontSize: '1.2rem' }}>Выбери, и получи игру!</p>
-      </div>
-
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#6ec5ffff', position: 'relative', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Карусель */}
       {order.map((keyIndex, posIndex) => {
         const key = keys[keyIndex]
@@ -305,22 +205,10 @@ const KeyCarousel: React.FC = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex-1 p-6 overflow-y-auto">
-                <motion.div className="flex justify-center -mb-3 drop-shadow-lg">
+                <div className="flex justify-center -mb-3 drop-shadow-lg">
                   <img src={selectedKey.src} alt={selectedKey.id} width={150} height={150} style={{ borderRadius: '20px', transform: 'rotate(270deg)' }} />
-                </motion.div>
-
-                <div className="space-y-2 text-sm text-gray-800">
-                  <p className="font-bold">Инструкция по активации:</p>
-                  <ol className="list-decimal ml-5">
-                    <li>Скачайте и установите клиент Steam.</li>
-                    <li>Зарегистрируйте аккаунт, если его нет.</li>
-                    <li>Запустите Steam и авторизуйтесь.</li>
-                    <li>В нижнем левом углу нажмите "Добавить игру" → "Активировать в Steam".</li>
-                    <li>Введите ключ активации, полученный после оплаты.</li>
-                  </ol>
                 </div>
 
-                {/* Промокод */}
                 <div className="mt-4 flex flex-col items-center space-y-2">
                   <input
                     type="text"
@@ -337,28 +225,20 @@ const KeyCarousel: React.FC = () => {
                   >
                     Применить
                   </motion.button>
-                  {activePromo && (
-                    <p className="text-green-600 font-semibold text-center">
-                      {activePromo.freeBronze 
-                        ? `Промокод применен: ${activePromo.code} (Бесплатный деревянный ключ!)`
-                        : `Промокод применен: ${activePromo.code} (${activePromo.discount * 100}%)`
-                      }
-                    </p>
-                  )}
+                  {activePromo && activePromo.freeWoodKey && <p className="text-green-600 font-semibold">Промокод активировал бесплатный деревянный ключ!</p>}
                   {promoError && <p className="text-red-600">{promoError}</p>}
                 </div>
               </div>
 
-              {/* Кнопка оплаты или получения бесплатного ключа */}
-              {showFreeButton && selectedKey.id === 'bronze' ? (
+              {/* Кнопка оплаты или бесплатного ключа */}
+              {activePromo?.freeWoodKey ? (
                 <motion.button
-                  className="w-full bg-green-500 text-white py-3 rounded-b-2xl flex justify-center items-center space-x-2 hover:bg-green-600"
+                  className="w-full bg-green-500 text-white py-3 rounded-b-2xl flex justify-center items-center hover:bg-green-600"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={handleFreeBronzeKey}
+                  onClick={handleFreeKey}
                 >
-                  <span>Получить бесплатно</span>
-                  <span>🎁</span>
+                  Получить бесплатно
                 </motion.button>
               ) : (
                 <motion.button
@@ -367,7 +247,7 @@ const KeyCarousel: React.FC = () => {
                   whileTap={{ scale: 0.95 }}
                   onClick={handlePay}
                 >
-                  <span>Оплатить {activePromo && !activePromo.freeBronze ? Math.round(selectedKey.price * (1 - activePromo.discount)) : selectedKey.price}</span>
+                  <span>Оплатить {activePromo?.discount ? Math.round(selectedKey.price * (1 - activePromo.discount)) : selectedKey.price}</span>
                   <Image src="/images/star.svg" alt="star" width={24} height={24} />
                 </motion.button>
               )}
@@ -376,7 +256,7 @@ const KeyCarousel: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Частицы после оплаты/получения */}
+      {/* Частицы после получения ключа */}
       {showNotification && (
         <div className="fixed inset-0 flex justify-center items-start pt-20 pointer-events-none z-50">
           <motion.div
@@ -385,7 +265,7 @@ const KeyCarousel: React.FC = () => {
             exit={{ y: -50, opacity: 0 }}
             className="bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg"
           >
-            {activePromo?.freeBronze ? 'Бесплатный ключ отправлен в бота!' : 'Ключ отправлен в бота!'}
+            Ключ отправлен в бота!
           </motion.div>
           {particles.map((p, i) => (
             <motion.div

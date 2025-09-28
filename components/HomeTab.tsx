@@ -20,10 +20,10 @@ const positions = [
 
 const random = (min: number, max: number) => Math.random() * (max - min) + min
 
-const promoCodes: { code: string; discount: number }[] = [
+const promoCodes: { code: string; discount: number; freeBronze?: boolean }[] = [
   { code: 'PROMO5', discount: 0.05 },
   { code: 'PROMO10', discount: 0.10 },
-  { code: 'FREEWOOD', discount: 1 }, // 100% скидка на деревянный ключ
+  { code: 'FREEWOOD', discount: 0, freeBronze: true }, // Новый промокод на бесплатный деревянный ключ
 ]
 
 const KeyCarousel: React.FC = () => {
@@ -33,9 +33,9 @@ const KeyCarousel: React.FC = () => {
   const [particles, setParticles] = useState<{ x: number; y: number; size: number; delay: number }[]>([])
   const [showNotification, setShowNotification] = useState(false)
   const [promoInput, setPromoInput] = useState('')
-  const [activePromo, setActivePromo] = useState<{ code: string; discount: number } | null>(null)
+  const [activePromo, setActivePromo] = useState<{ code: string; discount: number; freeBronze?: boolean } | null>(null)
   const [promoError, setPromoError] = useState('')
-  const [freeWoodUsed, setFreeWoodUsed] = useState(false)
+  const [showFreeButton, setShowFreeButton] = useState(false)
 
   // Снег
   const [snowflakes, setSnowflakes] = useState<{ x: number; y: number; size: number; speed: number }[]>([])
@@ -87,6 +87,8 @@ const KeyCarousel: React.FC = () => {
     if (posIndex === 1) {
       setSelectedKey(keys[keyIndex])
       setModalOpen(true)
+      // Сбрасываем состояние бесплатной кнопки при открытии модалки
+      setShowFreeButton(false)
     } else {
       if (keyIndex === order[0]) rotateRight()
       if (keyIndex === order[2]) rotateLeft()
@@ -100,28 +102,19 @@ const KeyCarousel: React.FC = () => {
       setPromoError('Промокод недействителен')
       return
     }
-    
-    // Проверка на промокод FREEWOOD
-    if (promo.code === 'FREEWOOD' && freeWoodUsed) {
-      setPromoError('Этот промокод уже был использован')
-      return
-    }
-
     setActivePromo(promo)
     setPromoError('')
+    
+    // Если промокод на бесплатный деревянный ключ и выбран деревянный ключ
+    if (promo.freeBronze && selectedKey?.id === 'bronze') {
+      setShowFreeButton(true)
+    }
   }
 
   const handlePay = async () => {
     if (!selectedKey) return
-
-    // Если активирован промокод FREEWOOD и выбран деревянный ключ
-    if (activePromo?.code === 'FREEWOOD' && selectedKey.id === 'bronze') {
-      await handleFreeWoodKey()
-      return
-    }
-
     let finalPrice = selectedKey.price
-    if (activePromo && activePromo.code !== 'FREEWOOD') {
+    if (activePromo && !activePromo.freeBronze) {
       finalPrice = Math.round(finalPrice * (1 - activePromo.discount))
     }
 
@@ -168,50 +161,47 @@ const KeyCarousel: React.FC = () => {
     }
   }
 
-  const handleFreeWoodKey = async () => {
+  const handleFreeBronzeKey = async () => {
+    if (!selectedKey || selectedKey.id !== 'bronze' || !activePromo?.freeBronze) return
+
     try {
-      // Отправляем запрос на сервер для выдачи бесплатного ключа
-      await fetch(`https://api.telegram.org/bot8042001288:AAGIKxiLEljnN6dtYxkohZ_TG30S0zElTU8/sendMessage`, {
+      // Имитируем запрос на сервер для получения бесплатного ключа
+      const res = await fetch('/api/free-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chat_id: window.Telegram!.WebApp.initDataUnsafe.user.id,
-          text: `🎉 Поздравляем! Вы получили бесплатный деревянный ключ по промокоду FREEWOOD!\n\nВаш ключ: WOOD-${Math.random().toString(36).substr(2, 9).toUpperCase()}\n\nИнструкция по активации:\n1. Запустите Steam\n2. В левом нижнем углу нажмите "Добавить игру"\n3. Выберите "Активировать в Steam"\n4. Введите полученный ключ`,
+          keyType: 'bronze',
+          promoCode: activePromo.code,
+          userId: window.Telegram?.WebApp.initDataUnsafe.user.id,
         }),
       })
 
-      // Помечаем промокод как использованный
-      setFreeWoodUsed(true)
-      setActivePromo(null)
-      setShowNotification(true)
-      setTimeout(() => {
-        setShowNotification(false)
-        setModalOpen(false)
-      }, 4000)
+      const data = await res.json()
 
+      if (data.success) {
+        // Показываем уведомление об успехе
+        setShowNotification(true)
+        setTimeout(() => {
+          setShowNotification(false)
+          setModalOpen(false)
+        }, 4000)
+
+        // Отправляем сообщение в бота
+        if (window.Telegram?.WebApp) {
+          await fetch(`https://api.telegram.org/bot8042001288:AAGIKxiLEljnN6dtYxkohZ_TG30S0zElTU8/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: window.Telegram.WebApp.initDataUnsafe.user.id,
+              text: `🎉 Поздравляем! Вы получили бесплатный деревянный ключ по промокоду!\n\nВаш ключ: \`${data.key}\``,
+              parse_mode: 'Markdown',
+            }),
+          })
+        }
+      }
     } catch (err) {
       console.error('Ошибка при получении бесплатного ключа:', err)
     }
-  }
-
-  const getButtonText = () => {
-    if (!selectedKey) return 'Оплатить'
-
-    // Если активирован промокод FREEWOOD и выбран деревянный ключ
-    if (activePromo?.code === 'FREEWOOD' && selectedKey.id === 'bronze') {
-      return 'Получить бесплатно'
-    }
-
-    let finalPrice = selectedKey.price
-    if (activePromo && activePromo.code !== 'FREEWOOD') {
-      finalPrice = Math.round(finalPrice * (1 - activePromo.discount))
-    }
-
-    return `Оплатить ${finalPrice}`
-  }
-
-  const isFreeButton = () => {
-    return activePromo?.code === 'FREEWOOD' && selectedKey?.id === 'bronze'
   }
 
   return (
@@ -348,41 +338,45 @@ const KeyCarousel: React.FC = () => {
                     Применить
                   </motion.button>
                   {activePromo && (
-                    <p className="text-green-600 font-semibold">
-                      Промокод применен: {activePromo.code} 
-                      {activePromo.code === 'FREEWOOD' ? ' (100% скидка на деревянный ключ)' : ` (${activePromo.discount * 100}%)`}
+                    <p className="text-green-600 font-semibold text-center">
+                      {activePromo.freeBronze 
+                        ? `Промокод применен: ${activePromo.code} (Бесплатный деревянный ключ!)`
+                        : `Промокод применен: ${activePromo.code} (${activePromo.discount * 100}%)`
+                      }
                     </p>
                   )}
                   {promoError && <p className="text-red-600">{promoError}</p>}
-                  
-                  {/* Сообщение о использованном промокоде FREEWOOD */}
-                  {freeWoodUsed && (
-                    <p className="text-orange-600 font-semibold">
-                      Промокод FREEWOOD уже был использован
-                    </p>
-                  )}
                 </div>
               </div>
 
-              <motion.button
-                className={`w-full py-3 rounded-b-2xl flex justify-center items-center space-x-2 ${
-                  isFreeButton() 
-                    ? 'bg-green-500 hover:bg-green-600 text-white' 
-                    : 'bg-blue-500 hover:bg-blue-600 text-white'
-                }`}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={isFreeButton() ? handleFreeWoodKey : handlePay}
-              >
-                <span>{getButtonText()}</span>
-                {!isFreeButton() && <Image src="/images/star.svg" alt="star" width={24} height={24} />}
-              </motion.button>
+              {/* Кнопка оплаты или получения бесплатного ключа */}
+              {showFreeButton && selectedKey.id === 'bronze' ? (
+                <motion.button
+                  className="w-full bg-green-500 text-white py-3 rounded-b-2xl flex justify-center items-center space-x-2 hover:bg-green-600"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleFreeBronzeKey}
+                >
+                  <span>Получить бесплатно</span>
+                  <span>🎁</span>
+                </motion.button>
+              ) : (
+                <motion.button
+                  className="w-full bg-blue-500 text-white py-3 rounded-b-2xl flex justify-center items-center space-x-2 hover:bg-blue-600"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handlePay}
+                >
+                  <span>Оплатить {activePromo && !activePromo.freeBronze ? Math.round(selectedKey.price * (1 - activePromo.discount)) : selectedKey.price}</span>
+                  <Image src="/images/star.svg" alt="star" width={24} height={24} />
+                </motion.button>
+              )}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Частицы после оплаты/получения ключа */}
+      {/* Частицы после оплаты/получения */}
       {showNotification && (
         <div className="fixed inset-0 flex justify-center items-start pt-20 pointer-events-none z-50">
           <motion.div
@@ -391,7 +385,7 @@ const KeyCarousel: React.FC = () => {
             exit={{ y: -50, opacity: 0 }}
             className="bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg"
           >
-            Ключ отправлен в бота!
+            {activePromo?.freeBronze ? 'Бесплатный ключ отправлен в бота!' : 'Ключ отправлен в бота!'}
           </motion.div>
           {particles.map((p, i) => (
             <motion.div

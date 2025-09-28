@@ -20,9 +20,11 @@ const positions = [
 
 const random = (min: number, max: number) => Math.random() * (max - min) + min
 
-const promoCodes: { code: string; discount: number }[] = [
+// теперь промо поддерживают скидку ИЛИ бесплатный ключ
+const promoCodes: { code: string; discount?: number; freeKeyId?: string; oneTime?: boolean }[] = [
   { code: 'PROMO5', discount: 0.05 },
-  { code: 'PROMO10', discount: 0.10 },
+  { code: 'PROMO10', discount: 0.1 },
+  { code: 'FREEWOOD', freeKeyId: 'bronze', oneTime: true }, // Новый промо
 ]
 
 const KeyCarousel: React.FC = () => {
@@ -32,8 +34,9 @@ const KeyCarousel: React.FC = () => {
   const [particles, setParticles] = useState<{ x: number; y: number; size: number; delay: number }[]>([])
   const [showNotification, setShowNotification] = useState(false)
   const [promoInput, setPromoInput] = useState('')
-  const [activePromo, setActivePromo] = useState<{ code: string; discount: number } | null>(null)
+  const [activePromo, setActivePromo] = useState<{ code: string; discount?: number; freeKeyId?: string; oneTime?: boolean } | null>(null)
   const [promoError, setPromoError] = useState('')
+  const [usedPromos, setUsedPromos] = useState<string[]>([])
 
   // Снег
   const [snowflakes, setSnowflakes] = useState<{ x: number; y: number; size: number; speed: number }[]>([])
@@ -41,7 +44,7 @@ const KeyCarousel: React.FC = () => {
   const [clouds, setClouds] = useState<{ x: number; y: number; scale: number; speed: number }[]>([])
 
   useEffect(() => {
-    // Частицы для оплаты
+    // Частицы
     const temp: { x: number; y: number; size: number; delay: number }[] = []
     for (let i = 0; i < 50; i++) {
       temp.push({
@@ -98,14 +101,36 @@ const KeyCarousel: React.FC = () => {
       setPromoError('Промокод недействителен')
       return
     }
+    if (promo.oneTime && usedPromos.includes(promo.code)) {
+      setPromoError('Этот промокод уже использован')
+      return
+    }
     setActivePromo(promo)
     setPromoError('')
+  }
+
+  const handleFreeKey = () => {
+    if (!selectedKey) return
+    if (activePromo?.freeKeyId === selectedKey.id) {
+      setShowNotification(true)
+      setTimeout(() => setShowNotification(false), 4000)
+
+      if (activePromo.oneTime) {
+        setUsedPromos(prev => [...prev, activePromo.code])
+      }
+      setModalOpen(false)
+    }
   }
 
   const handlePay = async () => {
     if (!selectedKey) return
     let finalPrice = selectedKey.price
-    if (activePromo) finalPrice = Math.round(finalPrice * (1 - activePromo.discount))
+
+    if (activePromo) {
+      if (activePromo.discount) {
+        finalPrice = Math.round(finalPrice * (1 - activePromo.discount))
+      }
+    }
 
     try {
       const res = await fetch('/api/create-invoice', {
@@ -128,14 +153,6 @@ const KeyCarousel: React.FC = () => {
 
         const handleInvoiceClose = async (event: any) => {
           if (event.status === 'paid') {
-            await fetch(`https://api.telegram.org/bot8042001288:AAGIKxiLEljnN6dtYxkohZ_TG30S0zElTU8/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: window.Telegram!.WebApp.initDataUnsafe.user.id,
-                text: `Вы успешно оплатили! Ваш ключ придет в этот чат.`,
-              }),
-            })
             setShowNotification(true)
             setTimeout(() => setShowNotification(false), 4000)
           }
@@ -144,7 +161,6 @@ const KeyCarousel: React.FC = () => {
 
         window.Telegram.WebApp.onEvent('invoiceClosed', handleInvoiceClose)
       }
-
     } catch (err) {
       console.error(err)
     }
@@ -177,7 +193,7 @@ const KeyCarousel: React.FC = () => {
             backgroundColor: 'rgba(255,255,255,0.8)',
           }}
           animate={{ y: window.innerHeight + flake.size }}
-          transition={{ repeat: Infinity, duration: flake.speed, ease: "linear", delay: Math.random() * 5 }}
+          transition={{ repeat: Infinity, duration: flake.speed, ease: 'linear', delay: Math.random() * 5 }}
         />
       ))}
 
@@ -193,7 +209,7 @@ const KeyCarousel: React.FC = () => {
             opacity: 0.5,
           }}
           animate={{ x: window.innerWidth + 200 }}
-          transition={{ repeat: Infinity, duration: cloud.speed, ease: "linear" }}
+          transition={{ repeat: Infinity, duration: cloud.speed, ease: 'linear' }}
         >
           <svg width="200" height="80" viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
             <ellipse cx="50" cy="40" rx="50" ry="25" fill="white" />
@@ -283,26 +299,43 @@ const KeyCarousel: React.FC = () => {
                   >
                     Применить
                   </motion.button>
-                  {activePromo && <p className="text-green-600 font-semibold">Промокод применен: {activePromo.code} ({activePromo.discount * 100}%)</p>}
+                  {activePromo && <p className="text-green-600 font-semibold">Промокод применен: {activePromo.code}</p>}
                   {promoError && <p className="text-red-600">{promoError}</p>}
                 </div>
               </div>
 
-              <motion.button
-                className="w-full bg-blue-500 text-white py-3 rounded-b-2xl flex justify-center items-center space-x-2 hover:bg-blue-600"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handlePay}
-              >
-                <span>Оплатить {activePromo ? Math.round(selectedKey.price * (1 - activePromo.discount)) : selectedKey.price}</span>
-                <Image src="/images/star.svg" alt="star" width={24} height={24} />
-              </motion.button>
+              {/* Оплата или Бесплатно */}
+              {activePromo?.freeKeyId === selectedKey.id ? (
+                <motion.button
+                  className="w-full bg-green-500 text-white py-3 rounded-b-2xl flex justify-center items-center space-x-2 hover:bg-green-600"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleFreeKey}
+                >
+                  <span>Получить бесплатно</span>
+                </motion.button>
+              ) : (
+                <motion.button
+                  className="w-full bg-blue-500 text-white py-3 rounded-b-2xl flex justify-center items-center space-x-2 hover:bg-blue-600"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handlePay}
+                >
+                  <span>
+                    Оплатить{' '}
+                    {activePromo?.discount
+                      ? Math.round(selectedKey.price * (1 - activePromo.discount))
+                      : selectedKey.price}
+                  </span>
+                  <Image src="/images/star.svg" alt="star" width={24} height={24} />
+                </motion.button>
+              )}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Частицы после оплаты */}
+      {/* Уведомление */}
       {showNotification && (
         <div className="fixed inset-0 flex justify-center items-start pt-20 pointer-events-none z-50">
           <motion.div

@@ -6,7 +6,7 @@ import Image from 'next/image'
 
 const keys = [
   { id: 'silver', src: '/img/Серебро.svg', price: 39 },
-  { id: 'gold', src: '/img/Золото.png', price: 1 },
+  { id: 'gold', src: '/img/Золото.png', price: 99 },
   { id: 'bronze', src: '/img/Древо.png', price: 9 },
 ]
 

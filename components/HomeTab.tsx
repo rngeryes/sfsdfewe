@@ -254,7 +254,7 @@ const KeyCarousel: React.FC = () => {
       {/* Тексты сверху */}
       <div style={{ position: 'absolute', top: '20px', width: '100%', textAlign: 'center' }}>
         <h1 style={{ color: '#fff', textShadow: '2px 2px 8px rgba(0,0,0,0.5)', fontSize: '2rem', margin: 0 }}>Выбери ключ</h1>
-        <p style={{ color: '#fff', textShadow: '1px 1px 6px rgba(0,0,0,0.5)', margin: 0, fontSize: '1.2rem' }}>В деревянном ключе промокод FREEWOOD</p>
+        <p style={{ color: '#fff', textShadow: '1px 1px 6px rgba(0,0,0,0.5)', margin: 0, fontSize: '1.2rem' }}>Выбери, и оплати ключ на игру!</p>
       </div>
 
       {/* Карусель */}

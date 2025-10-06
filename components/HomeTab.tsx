@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 
 const keys = [
-  { id: 'silver', src: '/img/Серебро.svg', price: 39 },
-  { id: 'gold', src: '/img/Золото.png', price: 99 },
-  { id: 'bronze', src: '/img/Древо.png', price: 9 },
+  { id: 'silver', src: '/img/Серебро.svg', price: 49 },
+  { id: 'gold', src: '/img/Золото.png', price: 120 },
+  { id: 'bronze', src: '/img/Древо.png', price: 19 },
 ]
 
 type KeyType = typeof keys[number]
@@ -23,7 +23,7 @@ const random = (min: number, max: number) => Math.random() * (max - min) + min
 const promoCodes: { code: string; discount: number }[] = [
   { code: 'PROMO5', discount: 0.05 },
   { code: 'PROMO10', discount: 0.10 },
-  { code: 'FREEWOOD', discount: -1 }, // Специальный промокод для бесплатного деревянного ключа
+  { code: 'FREEWOasdaqwdsaOD', discount: -1 }, // Специальный промокод для бесплатного деревянного ключа
 ]
 
 // Список бесплатных ключей для деревянного ключа
